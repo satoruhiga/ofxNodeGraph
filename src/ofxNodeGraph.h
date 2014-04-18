@@ -15,7 +15,9 @@ class Node
 
 public:
 	typedef shared_ptr<Node> Ref;
-
+	
+	virtual ~Node() {}
+	
 	virtual void update() {}
 	virtual void draw() {}
 
@@ -45,6 +47,7 @@ public:
 
 	// local transform
 
+	void setMatrix(const ofMatrix4x4& v);
 	const ofMatrix4x4& getMatrix() const;
 
 	void setPosition(const ofVec3f& v);
@@ -57,6 +60,7 @@ public:
 
 	// global transform
 
+	void setGlobalMatrix(const ofMatrix4x4& v);
 	const ofMatrix4x4& getGlobalMatrix() const;
 	const ofMatrix4x4& getParentGlobalMatrixInv() const;
 
@@ -134,9 +138,10 @@ private:
 
 	void updateLocalMatrix()
 	{
-		matrix.makeScaleMatrix(scale);
-		matrix.rotate(rotation);
-		matrix.setTranslation(position);
+		matrix.makeIdentityMatrix();
+		matrix.glTranslate(position);
+		matrix.glRotate(rotation);
+		matrix.glScale(scale);
 	}
 
 	void updateGlobalMatrix()
@@ -191,8 +196,6 @@ protected:
 		, scale(1)
 	{
 	}
-
-	virtual ~Node() {}
 
 private:
 	// noncopyable
@@ -306,24 +309,35 @@ inline vector<Node::Ref> Node::find(const string& name, bool recursive)
 
 // local transform
 
+inline void Node::setMatrix(const ofMatrix4x4& v)
+{
+	matrix = v;
+	ofQuaternion q;
+	matrix.decompose(position, rotation, scale, q);
+	updateGlobalMatrix();
+}
+
 inline const ofMatrix4x4& Node::getMatrix() const { return matrix; }
 
 inline void Node::setPosition(const ofVec3f& v)
 {
 	position = v;
 	updateLocalMatrix();
+	updateGlobalMatrix();
 }
 
 inline void Node::setRotation(const ofQuaternion& v)
 {
 	rotation = v;
 	updateLocalMatrix();
+	updateGlobalMatrix();
 }
 
 inline void Node::setScale(const ofVec3f& v)
 {
 	scale = v;
 	updateLocalMatrix();
+	updateGlobalMatrix();
 }
 
 inline const ofVec3f& Node::getPosition() const { return position; }
@@ -333,6 +347,15 @@ inline const ofQuaternion& Node::getRotation() const { return rotation; }
 inline const ofVec3f& Node::getScale() const { return scale; }
 
 // global transform
+
+inline void Node::setGlobalMatrix(const ofMatrix4x4& v)
+{
+	updateGlobalMatrix();
+	matrix = v * parent_global_matrix_inv;
+	ofQuaternion q;
+	matrix.decompose(position, rotation, scale, q);
+	global_matrix = v;
+}
 
 inline const ofMatrix4x4& Node::getGlobalMatrix() const { return global_matrix; }
 
@@ -344,19 +367,19 @@ inline const ofMatrix4x4& Node::getParentGlobalMatrixInv() const
 inline void Node::setGlobalPosition(const ofVec3f& v)
 {
 	updateGlobalMatrix();
-	setPosition(parent_global_matrix_inv.preMult(v));
+	setPosition(ofVec4f(v.x, v.y, v.z, 1) * parent_global_matrix_inv);
 }
 
 inline void Node::setGlobalRotation(const ofQuaternion& v)
 {
 	updateGlobalMatrix();
-	setRotation(parent_global_matrix_inv.getRotate() * v);
+	setRotation(v * parent_global_matrix_inv.getRotate());
 }
 
 inline void Node::setGlobalScale(const ofVec3f& v)
 {
 	updateGlobalMatrix();
-	setScale(parent_global_matrix_inv.getScale() * v);
+	setScale(v * parent_global_matrix_inv.getScale());
 }
 
 inline ofVec3f Node::getGlobalPosition() const
@@ -376,7 +399,7 @@ inline ofVec3f Node::getGlobalScale() const { return global_matrix.getScale(); }
 template <typename T0, typename T1>
 inline ofMatrix4x4 Node::getNodeToNodeTransform(const T0& from, const T1& to)
 {
-	return globalMatrix(to) * globalMatrix(from).getInverse();
+	return globalMatrix(from) * globalMatrix(to).getInverse();
 }
 
 // utility

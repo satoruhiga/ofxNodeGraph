@@ -48,7 +48,7 @@ public:
 		ofVec3f local = ofVec3f(0, 0, 0);
 		
 		// calc node to node transform
-		ofMatrix4x4 m = getNodeToNodeTransform(this, at<MySubNode>(0));
+		ofMatrix4x4 m = getNodeToNodeTransform(at<MySubNode>(0), this);
 		ofLine(local, m.preMult(local));
 		
 		ofPushStyle();
